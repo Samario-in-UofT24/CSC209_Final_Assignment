@@ -11,6 +11,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <math.h>
 
 /*
  * server.c
@@ -655,6 +656,13 @@ static void init_server(server_state_t *s,
     s->weights = calloc((size_t) dim, sizeof(float));
     if (s->weights == NULL) {
         die("calloc weights");
+    }
+
+    /* Random init to break symmetry — all-zero weights can't learn */
+    srand(42);
+    float limit = sqrtf(6.0f / (float)dim);
+    for (int i = 0; i < dim; i++) {
+        s->weights[i] = ((float)rand() / (float)RAND_MAX) * 2.0f * limit - limit;
     }
 
     s->listen_fd = create_listen_socket(port);
