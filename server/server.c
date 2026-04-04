@@ -299,7 +299,7 @@ static void broadcast_weights(server_state_t *s) {
     uint32_t payload_len = (uint32_t) (s->dim * (int) sizeof(float));
 
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        client_t *c = &s->clients[i];
+        client_t *c =&s->clients[i];
         if (!c->active || !c->ready) {
             continue;
         }
@@ -694,8 +694,8 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    server_state_t s;
-    init_server(&s, port, expected_workers, dim, learning_rate, max_rounds);
+    server_state_t *s = malloc(sizeof(server_state_t));
+    init_server(s, port, expected_workers, dim, learning_rate, max_rounds);
 
     printf("server: listening on port %u\n", port);
     printf("server: expecting %d workers, dim=%d, lr=%f, max_rounds=%d\n",
@@ -710,11 +710,11 @@ int main(int argc, char **argv) {
         FD_ZERO(&readfds);
         FD_ZERO(&writefds);
 
-        int maxfd = s.listen_fd;
-        FD_SET(s.listen_fd, &readfds);
+        int maxfd = s->listen_fd;
+        FD_SET(s->listen_fd, &readfds);
 
         for (int i = 0; i < MAX_CLIENTS; i++) {
-            client_t *c = &s.clients[i];
+            client_t *c = &s->clients[i];
             if (!c->active) {
                 continue;
             }
@@ -735,35 +735,35 @@ int main(int argc, char **argv) {
             die("select");
         }
 
-        if (FD_ISSET(s.listen_fd, &readfds)) {
-            accept_new_clients(&s);
+        if (FD_ISSET(s->listen_fd, &readfds)) {
+            accept_new_clients(s);
         }
 
         for (int i = 0; i < MAX_CLIENTS; i++) {
-            client_t *c = &s.clients[i];
+            client_t *c = &s->clients[i];
             if (!c->active) {
                 continue;
             }
 
             if (FD_ISSET(c->fd, &readfds)) {
-                handle_client_readable(&s, c);
+                handle_client_readable(s, c);
             }
 
             if (c->active && FD_ISSET(c->fd, &writefds)) {
                 flush_client_output(c);
                 if (!c->active) {
-                    handle_disconnect(&s, c);
+                    handle_disconnect(s, c);
                 }
             }
         }
 
-        remove_dead_clients(&s);
-        maybe_start_or_advance_training(&s);
+        remove_dead_clients(s);
+        maybe_start_or_advance_training(s);
 
-        if (s.training_finished) {
+        if (s->training_finished) {
             bool all_outputs_flushed = true;
             for (int i = 0; i < MAX_CLIENTS; i++) {
-                client_t *c = &s.clients[i];
+                client_t *c = &s->clients[i];
                 if (c->active && c->out_used > c->out_sent) {
                     all_outputs_flushed = false;
                     break;
@@ -775,6 +775,6 @@ int main(int argc, char **argv) {
         }
     }
 
-    destroy_server(&s);
+    destroy_server(s);
     return EXIT_SUCCESS;
 }
