@@ -499,3 +499,35 @@ void worker_destroy(WorkerState *w) {
 
     shard_free(&w->shard);
 }
+
+// Main
+
+int main(int argc, char **argv) {
+    if (argc != 5) {
+        fprintf(stderr,
+                "Usage: %s <server_ip> <port> <hidden_size> <shard_file>\n",
+                argv[0]);
+        return EXIT_FAILURE;
+    }
+ 
+    const char *host   = argv[1];
+    uint16_t    port   = (uint16_t)strtoul(argv[2], NULL, 10);
+    int hidden_size    = atoi(argv[3]);
+    const char *shard  = argv[4];
+ 
+    if (hidden_size <= 0) {
+        fprintf(stderr, "error: hidden_size must be positive\n");
+        return EXIT_FAILURE;
+    }
+ 
+    WorkerState w;
+    if (worker_init(&w, host, port, hidden_size, shard) == -1) {
+        fprintf(stderr, "error: worker_init failed\n");
+        return EXIT_FAILURE;
+    }
+ 
+    int result = worker_run(&w);
+    worker_destroy(&w);
+ 
+    return result == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+}
