@@ -56,7 +56,7 @@ typedef struct {
 //  Data shard
 
 /* A container for one worker's portion of the training data.
- * Each sample is a flat float vector of length `n_features`, and
+ * Each sample is a flat float vector of length 'n_features', and
  * each label is an integer class index. */
 typedef struct {
     float *X;          /* row-major: n_samples x n_features  */
@@ -135,7 +135,7 @@ void worker_destroy(WorkerState *w);
 
 //  Network I/O helpers
 
-/* Blocking send/recv of exactly `len` bytes.  Returns 0 on success,
+/* Blocking send/recv of exactly 'len' bytes.  Returns 0 on success,
  * -1 on error or unexpected EOF.  
  * The worker uses blocking I/O (unlike the server's non-blocking select loop) 
  * because each worker only talks
