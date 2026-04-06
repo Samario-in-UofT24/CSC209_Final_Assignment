@@ -1,3 +1,3 @@
-# Shitbox
+# Distributed Machine Learning Model Traning
 
-A simple C program project.
+A C program project.
