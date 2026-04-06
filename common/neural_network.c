@@ -3,6 +3,8 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdint.h>
 
 
 /* Xavier initialisation: uniform in [-limit, +limit] */
@@ -282,4 +284,108 @@ void grads_unpack(Grads *g, const Net *net, const float *buf) {
     memcpy(g->db1, buf + off, (size_t)hid * sizeof(float));       off += hid;
     memcpy(g->dW2, buf + off, (size_t)hid * out * sizeof(float)); off += hid * out;
     memcpy(g->db2, buf + off, (size_t)out * sizeof(float));
+}
+
+int net_save(const Net *net, const char *path) {
+    if (net == NULL || path == NULL) {
+        fprintf(stderr, "net_save: invalid argument\n");
+        return -1;
+    }
+
+    FILE *f = fopen(path, "wb");
+    if (f == NULL) {
+        perror("net_save fopen");
+        return -1;
+    }
+
+    int32_t meta[3];
+    meta[0] = net->input_size;
+    meta[1] = net->hidden_size;
+    meta[2] = net->output_size;
+
+    if (fwrite(meta, sizeof(int32_t), 3, f) != 3) {
+        fprintf(stderr, "net_save: failed to write metadata\n");
+        fclose(f);
+        return -1;
+    }
+
+    int param_count = net_param_count(net);
+    float *buf = malloc((size_t)param_count * sizeof(float));
+    if (buf == NULL) {
+        perror("net_save malloc");
+        fclose(f);
+        return -1;
+    }
+
+    net_pack_params(net, buf);
+
+    if (fwrite(buf, sizeof(float), (size_t)param_count, f) != (size_t)param_count) {
+        fprintf(stderr, "net_save: failed to write parameters\n");
+        free(buf);
+        fclose(f);
+        return -1;
+    }
+
+    free(buf);
+    fclose(f);
+    return 0;
+}
+
+int net_load(Net *net, const char *path) {
+    if (net == NULL || path == NULL) {
+        fprintf(stderr, "net_load: invalid argument\n");
+        return -1;
+    }
+
+    FILE *f = fopen(path, "rb");
+    if (f == NULL) {
+        perror("net_load fopen");
+        return -1;
+    }
+
+    int32_t meta[3];
+    if (fread(meta, sizeof(int32_t), 3, f) != 3) {
+        fprintf(stderr, "net_load: failed to read metadata\n");
+        fclose(f);
+        return -1;
+    }
+
+    int input_size = meta[0];
+    int hidden_size = meta[1];
+    int output_size = meta[2];
+
+    if (input_size <= 0 || hidden_size <= 0 || output_size <= 0) {
+        fprintf(stderr, "net_load: invalid metadata\n");
+        fclose(f);
+        return -1;
+    }
+
+    if (net_init(net, input_size, hidden_size, output_size) != 0) {
+        fprintf(stderr, "net_load: net_init failed\n");
+        fclose(f);
+        return -1;
+    }
+
+    int param_count = net_param_count(net);
+    float *buf = malloc((size_t)param_count * sizeof(float));
+    if (buf == NULL) {
+        perror("net_load malloc");
+        net_free(net);
+        fclose(f);
+        return -1;
+    }
+
+    if (fread(buf, sizeof(float), (size_t)param_count, f) != (size_t)param_count) {
+        fprintf(stderr, "net_load: failed to read parameters\n");
+        free(buf);
+        net_free(net);
+        fclose(f);
+        return -1;
+    }
+
+    net_unpack_params(net, buf);
+
+    free(buf);
+    fclose(f);
+    return 0;
 }

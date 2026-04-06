@@ -106,4 +106,8 @@ void net_unpack_params(Net *net, const float *buf);
 void grads_pack(const Grads *g, const Net *net, float *buf);
 void grads_unpack(Grads *g, const Net *net, const float *buf);
 
+// Save/load the network parameters to/from a file (for checkpointing)
+int net_save(const Net *net, const char *path);
+int net_load(Net *net, const char *path);
+
 #endif 
