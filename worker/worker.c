@@ -354,11 +354,29 @@ static int train_one_round(WorkerState *w, const float *weights_payload) {
     float accuracy = 100.0f * (float)correct / (float)w->shard.n_samples;
 
     printf("worker %u: round %u | loss: %.4f | accuracy: %.1f%% (%d/%d)\n",
-           w->worker_id, w->current_round,
-           avg_loss, accuracy, correct, w->shard.n_samples);
+        w->worker_id, w->current_round,
+        avg_loss, accuracy, correct, w->shard.n_samples);
 
-    /* Pack gradients (already accumulated, NOT averaged — server will
-     * average across all workers) */
+    /* Average gradients over local samples before sending to server */
+    float inv_n = 1.0f / (float)w->shard.n_samples;
+
+    int in  = w->net.input_size;
+    int hid = w->net.hidden_size;
+    int out = w->net.output_size;
+
+    for (int i = 0; i < in * hid; i++) {
+        w->grads.dW1[i] *= inv_n;
+    }
+    for (int i = 0; i < hid; i++) {
+        w->grads.db1[i] *= inv_n;
+    }
+    for (int i = 0; i < hid * out; i++) {
+        w->grads.dW2[i] *= inv_n;
+    }
+    for (int i = 0; i < out; i++) {
+        w->grads.db2[i] *= inv_n;
+    }
+
     grads_pack(&w->grads, &w->net, w->param_buf);
 
     /* Send gradients to server */
@@ -412,6 +430,18 @@ static int training_loop(WorkerState *w) {
             if (plen == expected) {
                 net_unpack_params(&w->net, (const float *)payload);
                 printf("worker %u: final weights received\n", w->worker_id);
+
+                char model_path[128];
+                snprintf(model_path, sizeof(model_path),
+                        "trained_model_worker_%u.bin", w->worker_id);
+
+                if (net_save(&w->net, model_path) == 0) {
+                    printf("worker %u: saved model to %s\n",
+                        w->worker_id, model_path);
+                } else {
+                    fprintf(stderr, "worker %u: failed to save model\n",
+                            w->worker_id);
+                }
             }
 
             w->finished = true;

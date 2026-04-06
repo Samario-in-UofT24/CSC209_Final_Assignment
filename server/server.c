@@ -16,8 +16,6 @@
 /*
  * server.c
  *
- * Parameter-server skeleton for CSC209 Category 2.
- *
  * Protocol summary (all messages are length-prefixed binary messages):
  *   header = 4 uint32_t fields in network byte order:
  *     type, payload_len, round, worker_id
@@ -37,8 +35,8 @@
  */
 
 #define MAX_CLIENTS   64
-#define INBUF_SIZE    65536
-#define OUTBUF_SIZE   65536
+#define INBUF_SIZE    (1024*1024)
+#define OUTBUF_SIZE   (1024*1024)
 #define BACKLOG       16
 
 #define MSG_HELLO     1u
@@ -658,13 +656,41 @@ static void init_server(server_state_t *s,
         die("calloc weights");
     }
 
-    /* Random init to break symmetry — all-zero weights can't learn */
+    // Initialize weights with random values (match our nn's Xavier initialization)
     srand(42);
-    float limit = sqrtf(6.0f / (float)dim);
-    for (int i = 0; i < dim; i++) {
-        s->weights[i] = ((float)rand() / (float)RAND_MAX) * 2.0f * limit - limit;
-    }
 
+    int in = 784;
+    int hid = 64;
+    int out = 10;
+
+    int off = 0;
+
+    /* W1 */
+    float limit1 = sqrtf(6.0f / (float)(in + hid));
+    for (int i = 0; i < in * hid; i++) {
+        s->weights[off + i] =
+            ((float)rand() / (float)RAND_MAX) * 2.0f * limit1 - limit1;
+    }
+    off += in * hid;
+
+    /* b1 = 0 */
+    for (int i = 0; i < hid; i++) {
+        s->weights[off + i] = 0.0f;
+    }
+    off += hid;
+
+    /* W2 */
+    float limit2 = sqrtf(6.0f / (float)(hid + out));
+    for (int i = 0; i < hid * out; i++) {
+        s->weights[off + i] =
+            ((float)rand() / (float)RAND_MAX) * 2.0f * limit2 - limit2;
+    }
+    off += hid * out;
+
+    /* b2 = 0 */
+    for (int i = 0; i < out; i++) {
+        s->weights[off + i] = 0.0f;
+    }
     s->listen_fd = create_listen_socket(port);
     if (s->listen_fd == -1) {
         die("create_listen_socket");
